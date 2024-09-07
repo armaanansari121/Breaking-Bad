@@ -8,6 +8,7 @@ import {
   EdgeAttributes,
 } from "common";
 import Graph from "graphology";
+import { PrismaClient } from '@repo/db';
 dotenv.config();
 
 const config = {
@@ -15,6 +16,7 @@ const config = {
   network: Network.ETH_SEPOLIA,
 };
 
+const prisma = new PrismaClient();
 const alchemy = new Alchemy(config);
 
 const graph: Graph<NodeAttributes, EdgeAttributes> = new Graph({ multi: true });
@@ -123,14 +125,12 @@ const traceTransaction = async (
 
 let INITIAL_BLOCK_NUMBER = 0;
 
-const main = async (Hash: string) => {
+export const startTrace = async (Hash: string) => {
   const tx = (await alchemy.transact.getTransaction(
     Hash
   )) as TransactionResponse;
 
   const weiValue = tx.value.toString();
-
-  const weiValue = tx.value.toString(); 
 
   const weiLength = weiValue.length;
 
@@ -161,5 +161,12 @@ const main = async (Hash: string) => {
   for (const endReceiver of endReceivers ?? []) {
     console.log(`${endReceiver.address}: ${endReceiver.balance}`);
   }
+  const serializedGraph = graph.export();
+  await prisma.trace.create({
+    data: {
+      txHash: Hash,
+      result: serializedGraph
+    }
+  })
   return endReceivers;
 };

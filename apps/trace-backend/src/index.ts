@@ -1,24 +1,55 @@
-import { createClient } from "redis";
+import { createClient, RedisClientType } from 'redis';
 import { startTrace } from "./engine/trace";
 import { receiverType } from "common";
 
-const client = createClient();
-const client2 = createClient();
+const client: RedisClientType = createClient({
+  url: `redis://localhost:${process.env.REDIS_QUEUE_PORT}`
+});
+const client2: RedisClientType = createClient({
+  url: `redis://localhost:${process.env.REDIS_PUBSUB_PORT}`
+});
 
-
-async function main() {
-
-  await client.connect();
-  await client2.connect();
-
-  const txHash = await client.brPop("hash", 0);
-  const hash = txHash?.element;
-  const result = await startTrace(hash ?? "0x41b612c807de079526f542f507dc1b24b69f426084df2861f0826766259d520d");
-  const response: receiverType = {
-    txhash: hash ?? '',
-    payload: result
-  }
-  client2.publish(hash ?? '', JSON.stringify(result));
+function isValidHash(hash: string): boolean {
+  return /^0x[a-fA-F0-9]{64}$/.test(hash);
 }
 
-main();
+async function main() {
+  try {
+    await client.connect();
+    await client2.connect();
+
+    while (true) {
+      const txHash = await client.brPop("hash", 0);
+      if (!txHash || !txHash.element) {
+        console.error("Invalid or missing hash from queue");
+        continue;
+      }
+      const hash = txHash.element;
+      if (!isValidHash(hash)) {
+        console.error("Invalid hash format:", hash);
+        continue;
+      }
+      try {
+        const result = await startTrace(hash);
+        const response: receiverType = {
+          txhash: hash,
+          payload: result
+        };
+        const publishResult = await client2.publish(hash, JSON.stringify(response));
+      } catch (error) {
+        console.error("Error during trace or publish:", error);
+        // Publish an error message to the channel
+        await client2.publish(hash, JSON.stringify({ error: "Trace failed" }));
+      }
+    }
+  } catch (error) {
+    console.error("Fatal error in trace-backend:", error);
+  } finally {
+    console.log("Closing Redis connections...");
+    await client.quit();
+    await client2.quit();
+    console.log("Redis connections closed");
+  }
+}
+
+main().catch(console.error);

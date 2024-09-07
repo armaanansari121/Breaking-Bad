@@ -10,6 +10,8 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+console.log("in api server index.ts")
+
 app.use('/user', userRoutes);
 // app.use('/pastTrace');
 app.use('/trace', traceRoute);

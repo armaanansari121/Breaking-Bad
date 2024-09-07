@@ -96,7 +96,7 @@ export const startTrace = async (Hash: string) => {
   const tx = (await alchemy.transact.getTransaction(
     Hash
   )) as TransactionResponse;
-
+  console.log("in trace engine");
   const weiValue = tx.value.toString(); 
   const weiLength = weiValue.length;
 

@@ -1,44 +1,72 @@
-import { Router } from 'express'
-import { createClient } from 'redis'
-import { hashType, receiverType } from "common"
+import { Router } from 'express';
+import { createClient, RedisClientType } from 'redis';
+import { hashType, receiverType } from "common";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const trace = Router();
 
-const client = createClient();
-const client2 = createClient();
+const client: RedisClientType = createClient({
+    url: `redis://localhost:${process.env.REDIS_QUEUE_PORT}`
+});
+const client2: RedisClientType = createClient({
+    url: `redis://localhost:${process.env.REDIS_PUBSUB_PORT}`
+});
 
 (async () => {
-    await client.connect();
-    await client2.connect();
+    try {
+        await client.connect();
+        console.log('Redis client 1 connected');
+        await client2.connect();
+        console.log('Redis client 2 connected');
+    } catch (error) {
+        console.error('Redis connection error:', error);
+    }
 })();
 
 trace.post('/', async (req, res) => {
-    const response = hashType.safeParse(req.body);
-    if(!response.success){
-        res.send({payload: response.error.errors[0].message});
-    }
-    const hash = response.data?.txHash;
+    let unsubscribe: (() => void) | null = null;
 
-    client2.subscribe(hash ?? '', (error) => {
-        if (error) {
-            console.error('Subscription error:', error);
-            return res.status(500).send({ payload: 'Subscription error' });
+    try {
+        const response = hashType.safeParse(req.body);
+        if (!response.success) {
+            return res.status(400).send({ payload: response.error.errors[0].message });
         }
-    });
-    //@ts-ignore
-    const endReceivers : Promise<receiverType> = await new Promise((res) => {
-        client2.on('message', (message) => {
+
+        const hash = response.data?.txHash;
+        if (!hash) {
+            return res.status(400).send({ payload: 'Invalid transaction hash' });
+        }
+
+        await client.lPush("hash", hash);
+
+        await client2.subscribe(hash, (message) => {
+            try {
+                const result = JSON.parse(message);
+                res.send(result.payload);
+            } catch (error) {
+                console.error("Error parsing trace result:", error);
+                if (!res.headersSent) {
+                    res.status(500).send({ payload: 'Invalid trace result format' });
+                }
+            }
+        });
+
+        // Set a timeout to handle cases where no message is received
+        setTimeout(() => {
+            if (!res.headersSent) {
+                res.status(504).send({ payload: 'Timeout waiting for trace result' });
+            }
             client2.unsubscribe(hash);
+        }, 30000); // 30 second timeout
 
-            res(JSON.parse(message));
-        })
-    })
-
-    await client.lPush("hash",JSON.stringify(hash));
-
-    const receiver : receiverType = await endReceivers;
-
-    res.send(receiver.payload)
-})
+    } catch (error) {
+        console.error('Error in trace route:', error);
+        if (!res.headersSent) {
+            res.status(500).send({ payload: 'Internal server error' });
+        }
+    }
+});
 
 export default trace;

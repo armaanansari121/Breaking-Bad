@@ -33,6 +33,7 @@ async function getTransactions(fromAddress: string) {
     category: [
       AssetTransfersCategory.EXTERNAL,
       AssetTransfersCategory.INTERNAL,
+      AssetTransfersCategory.ERC20
     ],
   });
   return response["transfers"];
@@ -59,13 +60,13 @@ const traceTransaction = async (
 ): Promise<BalanceInfo[] | undefined> => {
   try {
     const initialAddress = tx.to ?? "";
-    if (
-      initialAddress === "0x941b727ad8acf020558ce58cd7cb65b48b958db1" ||
-      initialAddress === "0x941b727Ad8ACF020558Ce58CD7Cb65b48B958DB1" ||
-      initialAddress === "0xE026E9dC9c5D5Bb11b434F14e0fB5da3A40DdD97" ||
-      initialAddress === "0xe026e9dc9c5d5bb11b434f14e0fb5da3a40ddd97"
-    )
-      return;
+    // if (
+    //   initialAddress === "0x941b727ad8acf020558ce58cd7cb65b48b958db1" ||
+    //   initialAddress === "0x941b727Ad8ACF020558Ce58CD7Cb65b48B958DB1" ||
+    //   initialAddress === "0xE026E9dC9c5D5Bb11b434F14e0fB5da3A40DdD97" ||
+    //   initialAddress === "0xe026e9dc9c5d5bb11b434f14e0fb5da3a40ddd97"
+    // )
+    //   return;
 
     const resto = parseFloat(balances.get(tx.to ?? "") ?? "0");
     balances.set(tx.to ?? "", (resto + parseFloat(tx.value)).toString());
@@ -86,13 +87,13 @@ const traceTransaction = async (
         txHash: tx.hash,
         blockNumber: parseInt(tx.blockNum, 16),
       };
-      if (
-        txn.to === "0x941b727Ad8ACF020558Ce58CD7Cb65b48B958DB1" ||
-        txn.to === "0x941b727ad8acf020558ce58cd7cb65b48b958db1" ||
-        txn.to === "0xE026E9dC9c5D5Bb11b434F14e0fB5da3A40DdD97" ||
-        txn.to === "0xe026e9dc9c5d5bb11b434f14e0fb5da3a40ddd97"
-      )
-        continue;
+      // if (
+      //   txn.to === "0x941b727Ad8ACF020558Ce58CD7Cb65b48B958DB1" ||
+      //   txn.to === "0x941b727ad8acf020558ce58cd7cb65b48b958db1" ||
+      //   txn.to === "0xE026E9dC9c5D5Bb11b434F14e0fB5da3A40DdD97" ||
+      //   txn.to === "0xe026e9dc9c5d5bb11b434f14e0fb5da3a40ddd97"
+      // )
+      //   continue;
       if (txn.blockNumber < INITIAL_BLOCK_NUMBER) {
         continue;
       }

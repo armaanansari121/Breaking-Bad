@@ -129,6 +129,9 @@ const main = async (Hash: string) => {
   )) as TransactionResponse;
 
   const weiValue = tx.value.toString();
+
+  const weiValue = tx.value.toString(); 
+
   const weiLength = weiValue.length;
 
   let ethValue;

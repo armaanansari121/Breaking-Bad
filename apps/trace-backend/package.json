@@ -13,9 +13,10 @@
   "dependencies": {
     "@types/redis": "^4.0.11",
     "alchemy-sdk": "^3.4.1",
+    "common": "*",
     "dotenv": "^16.4.5",
-    "redis": "^4.7.0",
-    "common": "*"
+    "graphology": "^0.25.4",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.5.2"

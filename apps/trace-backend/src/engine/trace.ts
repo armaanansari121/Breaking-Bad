@@ -1,8 +1,13 @@
 import { Network, Alchemy, TransactionResponse } from "alchemy-sdk";
 import dotenv from "dotenv";
 import { AssetTransfersCategory } from "alchemy-sdk";
-import { BalanceInfo } from "common";
-import { mappedData } from "common";
+import {
+  BalanceInfo,
+  mappedData,
+  NodeAttributes,
+  EdgeAttributes,
+} from "common";
+import Graph from "graphology";
 dotenv.config();
 
 const config = {
@@ -12,8 +17,7 @@ const config = {
 
 const alchemy = new Alchemy(config);
 
-const balances: Map<string, string> = new Map();
-const visited: Map<string, boolean> = new Map();
+const graph: Graph<NodeAttributes, EdgeAttributes> = new Graph({ multi: true });
 
 async function getTransactions(fromAddress: string) {
   let response = await alchemy.core.getAssetTransfers({
@@ -21,7 +25,7 @@ async function getTransactions(fromAddress: string) {
     category: [
       AssetTransfersCategory.EXTERNAL,
       AssetTransfersCategory.INTERNAL,
-      AssetTransfersCategory.ERC20
+      AssetTransfersCategory.ERC20,
     ],
   });
   return response["transfers"];
@@ -30,12 +34,12 @@ async function getTransactions(fromAddress: string) {
 function checkBalances(): BalanceInfo[] {
   const sortedBalances: BalanceInfo[] = [];
 
-  for (const [address, value] of balances) {
-    const balance = parseFloat(value);
+  graph.forEachNode((node, attributes) => {
+    const balance = parseFloat(attributes.balance);
     if (!isNaN(balance)) {
-      sortedBalances.push({ address, balance });
+      sortedBalances.push({ address: node, balance });
     }
-  }
+  });
 
   sortedBalances.sort((a, b) => b.balance - a.balance);
 
@@ -47,18 +51,47 @@ const traceTransaction = async (
   retries = 3
 ): Promise<BalanceInfo[] | undefined> => {
   try {
-    const initialAddress = tx.to ?? "";
+    // console.log(tx.from, tx.to, tx.txHash);
+    if (!tx.to || tx.to.trim() === "") {
+      const receipt = await alchemy.core.getTransactionReceipt(tx.txHash);
+      if (receipt && receipt.contractAddress) {
+        tx.to = receipt.contractAddress.toLowerCase();
+      } else {
+        return undefined;
+      }
+    }
 
-    const resto = parseFloat(balances.get(tx.to ?? "") ?? "0");
-    balances.set(tx.to ?? "", (resto + parseFloat(tx.value)).toString());
-    const resfrom = parseFloat(balances.get(tx.from ?? "") ?? "0");
-    balances.set(tx.from ?? "", (resfrom - parseFloat(tx.value)).toString());
+    const existedTo = graph.hasNode(tx.to);
+    const existedFrom = graph.hasNode(tx.from);
 
-    if (visited.get(initialAddress) === true) return;
-    console.log(initialAddress);
-    visited.set(initialAddress, true);
+    if (!existedTo) {
+      graph.addNode(tx.to, { balance: "0" });
+    }
+    if (!existedFrom) {
+      graph.addNode(tx.from, { balance: "0" });
+    }
 
-    const transactions = await getTransactions(initialAddress);
+    graph.addEdge(tx.from, tx.to, {
+      from: tx.from,
+      to: tx.to,
+      value: tx.value,
+      txHash: tx.txHash,
+      blockNumber: tx.blockNumber,
+    });
+
+    graph.updateNodeAttribute(tx.to ?? "", "balance", (bal) => {
+      if (bal) return (parseFloat(bal) + parseFloat(tx.value)).toString();
+      return parseFloat(tx.value).toString();
+    });
+    graph.updateNodeAttribute(tx.from ?? "", "balance", (bal) => {
+      if (bal) return (parseFloat(bal) - parseFloat(tx.value)).toString();
+      return parseFloat(tx.value).toString();
+    });
+
+    if (existedTo) return;
+    console.log(tx.to);
+
+    const transactions = await getTransactions(tx.to);
 
     for (const tx of transactions) {
       const txn: mappedData = {
@@ -68,7 +101,6 @@ const traceTransaction = async (
         txHash: tx.hash,
         blockNumber: parseInt(tx.blockNum, 16),
       };
-
       if (txn.blockNumber < INITIAL_BLOCK_NUMBER) {
         continue;
       }
@@ -91,22 +123,19 @@ const traceTransaction = async (
 
 let INITIAL_BLOCK_NUMBER = 0;
 
-export const startTrace = async (Hash: string) => {
-
+const main = async (Hash: string) => {
   const tx = (await alchemy.transact.getTransaction(
     Hash
   )) as TransactionResponse;
 
-  const weiValue = tx.value.toString(); 
+  const weiValue = tx.value.toString();
   const weiLength = weiValue.length;
 
-  // If the length of the string is greater than 18, insert the decimal point
   let ethValue;
   if (weiLength > 18) {
     ethValue =
       weiValue.slice(0, weiLength - 18) + "." + weiValue.slice(weiLength - 18);
   } else {
-    // If it's less than or equal to 18, prepend zeros to the start and then add the decimal
     const paddedWeiValue = weiValue.padStart(18, "0");
     ethValue = "0." + paddedWeiValue;
   }

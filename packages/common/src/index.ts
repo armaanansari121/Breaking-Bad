@@ -29,6 +29,14 @@ export type receiverType = {
     payload?: BalanceInfo[]
 }
 
+export interface mappedData {
+    from: string;
+    to: string;
+    value: string;
+    txHash: string;
+    blockNumber: number;
+  }
+
 export interface BalanceInfo {
     address: string;
     balance: number;

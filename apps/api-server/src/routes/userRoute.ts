@@ -1,6 +1,13 @@
 import { Router } from "express";
 import { PrismaClient } from "@repo/db";
-import { userType, loginType } from "common";
+import Graph from "graphology";
+import {
+  userType,
+  loginType,
+  hashType,
+  NodeAttributes,
+  EdgeAttributes,
+} from "common";
 
 const user = Router();
 const prisma = new PrismaClient();
@@ -55,6 +62,44 @@ user.post("/signin", async (req, res) => {
     }
   } catch (err) {
     return res.status(500).send({ payload: "Internal server error" });
+  }
+});
+
+user.post("/graph", async (req, res) => {
+  try {
+    const response = hashType.safeParse(req.body);
+    const hash = response.data?.txHash as string;
+    // Fetch the trace from the database
+    const trace = await prisma.trace.findFirst({
+      where: {
+        txHash: hash,
+      },
+      include:{
+        
+      }
+    });
+
+    if (trace) {
+      const graph = trace.result;
+      //const cexaddress = trace.cexAddresses;
+      const jsonString: string = JSON.stringify(graph);
+
+      const newGraph: Graph<NodeAttributes, EdgeAttributes> = new Graph({
+        multi: true,
+      });
+
+      const serializedValue = JSON.parse(jsonString);
+      newGraph.import(serializedValue);
+
+      const serializedGraphData = newGraph.export();
+
+      res.status(200).json({ graph: serializedGraphData});
+    } else {
+      res.status(404).json({ error: "Trace not found" });
+    }
+  } catch (error) {
+    console.error("Error fetching trace graph:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 

@@ -16,7 +16,8 @@
     "common": "*",
     "dotenv": "^16.4.5",
     "graphology": "^0.25.4",
-    "redis": "^4.7.0"
+    "redis": "^4.7.0",
+    "@repo/db": "*"
   },
   "devDependencies": {
     "@types/node": "^22.5.2"

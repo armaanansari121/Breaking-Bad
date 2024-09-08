@@ -27,7 +27,7 @@ const CEX: string[] = [
 const graph: Graph<NodeAttributes, EdgeAttributes> = new Graph({ multi: true });
 
 
-const cexAddresses: EdgeAttributes[] = [];
+let cexAddresses: EdgeAttributes[] = [];
 let cexId = 0;
 let edgeId = 0;
 
@@ -214,6 +214,7 @@ export const startTrace = async (Hash: string) => {
       }
     }
   });
+  cexAddresses = []
 
   return endReceivers;
 };

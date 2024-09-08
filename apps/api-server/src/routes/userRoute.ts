@@ -75,7 +75,7 @@ user.post("/graph", async (req, res) => {
         txHash: hash,
       },
       include:{
-        
+        cexAddresses: true
       }
     });
 
@@ -92,8 +92,8 @@ user.post("/graph", async (req, res) => {
       newGraph.import(serializedValue);
 
       const serializedGraphData = newGraph.export();
-
-      res.status(200).json({ graph: serializedGraphData});
+      console.log({ graph: serializedGraphData, addresses: trace.cexAddresses});
+      res.status(200).json({ graph: serializedGraphData, addresses: trace.cexAddresses});
     } else {
       res.status(404).json({ error: "Trace not found" });
     }

@@ -10,6 +10,15 @@ import axios from "axios";
 
 const BACKEND_URL = "http://localhost:5000";
 
+interface EdgeAttribute {
+  id: number;
+  from: string;
+  to: string;
+  value: string;
+  txHash: string;
+  blockNumber: number;
+}
+
 function convertToMermaid(data: { nodes: any[]; edges: any[] }) {
   let mermaidString = "graph LR\n";
 
@@ -38,7 +47,7 @@ export default function TransactionGraph() {
   const tHash = params.id as string;
   const [generatedGraph, setGeneratedGraph] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [cexAddress, setCexAddress] = useState<string[]>([]);
+  const [cexAddresses, setCexAddresses] = useState<EdgeAttribute[]>([]);
   const [endReceivers, setEndReceivers] = useState<
     { address: string; balance: number }[]
   >([]);
@@ -56,17 +65,14 @@ export default function TransactionGraph() {
           txHash: tHash,
         });
 
-        console.log(serializedGraphData.data.graph);
         console.log(serializedGraphData.data.addresses);
-        console.log(endReceiversData.data);
 
         if (serializedGraphData.data) {
           try {
             const exgraph = convertToMermaid(serializedGraphData.data.graph);
             setGeneratedGraph(exgraph);
-            setCexAddress(serializedGraphData.data.addresses);
+            setCexAddresses(Array.isArray(serializedGraphData.data.addresses) ? serializedGraphData.data.addresses : []);
             setEndReceivers(endReceiversData.data);
-            console.log(cexAddress);
           } catch (conversionError) {
             console.error("Error generating Mermaid diagram:", conversionError);
           }
@@ -136,26 +142,38 @@ export default function TransactionGraph() {
           <MermaidDiagram chart={generatedGraph} />
         </div>
 
-        {/*cexAddress.length > 0 && (
+        
+        {cexAddresses && cexAddresses.length > 0 && (
           <div className="mt-10 px-4">
             <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
               CEX Transactions
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {cexAddress.map((address, index) => (
-                <div
-                  key={index}
-                  className="bg-white shadow-md rounded-lg p-4 hover:shadow-lg transition-shadow duration-300"
-                >
-                  <p className="text-lg font-semibold text-gray-800">
-                    {`Address ${index + 1}`}
-                  </p>
-                  <p className="mt-2 text-gray-600 break-all">{address}</p>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="px-4 py-2">From</th>
+                    <th className="px-4 py-2">To</th>
+                    <th className="px-4 py-2">Value</th>
+                    <th className="px-4 py-2">Transaction Hash</th>
+                    <th className="px-4 py-2">Block Number</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cexAddresses.map((edge, index) => (
+                    <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                      <td className="px-4 py-2 break-all">{edge.from}</td>
+                      <td className="px-4 py-2 break-all">{edge.to}</td>
+                      <td className="px-4 py-2">{edge.value}</td>
+                      <td className="px-4 py-2 break-all">{edge.txHash}</td>
+                      <td className="px-4 py-2">{edge.blockNumber}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        )*/}
+        )}
       </div>
     </>
   );

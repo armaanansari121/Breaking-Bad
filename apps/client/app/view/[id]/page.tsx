@@ -6,8 +6,12 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import "../../styles.css";
 import { getTraceGraph } from "@/app/actions";
+import axios from "axios";
 import Graph from "graphology";
 import { NodeAttributes, EdgeAttributes } from "common";
+import { Hashtype } from "common";
+
+const BACKEND_URL = "http://localhost:5000";
 
 const newGraph = new Graph<NodeAttributes, EdgeAttributes>();
 newGraph.addNode("InitialHash", { balance: "0" });
@@ -69,30 +73,36 @@ function graphToMermaid(graph: Graph<NodeAttributes, EdgeAttributes>): string {
   return mermaidCode;
 }
 
-
-
 export default function TransactionGraph() {
   const params = useParams();
-  const transactionHash = params.id as string;
+  const txHash = params.id as string;
   const [generatedGraph, setGeneratedGraph] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [hashInputs, setHashInputs] = useState<Hashtype>({
+    txHash: "",
+  });
 
   useEffect(() => {
     const fetchGraphData = async () => {
       try {
-        const serializedGraphData = await getTraceGraph(transactionHash);
-
-        if (serializedGraphData) {
+        setHashInputs({
+          ...hashInputs,
+          txHash: txHash,
+        });
+        const serializedGraphData = await axios.post(
+          `${BACKEND_URL}/trace}`,
+          hashInputs
+        );
+        console.log(serializedGraphData);
+        /*if (serializedGraphData) {
           const newGraph: Graph<NodeAttributes, EdgeAttributes> = new Graph({
             multi: true,
           });
-          newGraph.import(serializedGraphData);
           const exgraph = graphToMermaid(newGraph);
           setGeneratedGraph(exgraph);
-          
         } else {
           console.error("Failed to deserialize graph data");
-        }
+        }*/
       } catch (error) {
         console.error("Error fetching graph data:", error);
       } finally {

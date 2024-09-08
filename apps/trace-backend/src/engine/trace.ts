@@ -26,7 +26,10 @@ const CEX: string[] = [
 
 const graph: Graph<NodeAttributes, EdgeAttributes> = new Graph({ multi: true });
 
-const cexAddresses: string[] = [];
+
+const cexAddresses: EdgeAttributes[] = [];
+let cexId = 0;
+let edgeId = 0;
 
 function convertWeiToEth(val: number) {
   const weiValue = val.toString();
@@ -114,8 +117,16 @@ const traceTransaction = async (
     });
 
     if (CEX.includes(tx.to)) {
-      cexAddresses.push(tx.from);
+      cexAddresses.push({
+        from: tx.from,
+        to: tx.to,
+        value: tx.value,
+        txHash: tx.txHash,
+        blockNumber: tx.blockNumber
+      });
     }
+
+
 
     if (existedTo) return;
     console.log(tx.to);
@@ -160,7 +171,6 @@ export const startTrace = async (Hash: string) => {
     Hash
   )) as TransactionResponse;
 
-
   const ethValue = convertWeiToEth(Number(tx.value));
 
 
@@ -183,14 +193,27 @@ export const startTrace = async (Hash: string) => {
     console.log(`${endReceiver.address}: ${endReceiver.balance}`);
   }
   const serializedGraph = graph.export();
-  console.log(serializedGraph);
-  
+
+  const edgeAttributesData = cexAddresses.map(({ from, to, value, txHash, blockNumber }) => ({
+    from,
+    to,
+    value,
+    txHash,
+    blockNumber
+  }));
+
+  // Create Trace record with cexAddresses
   await prisma.trace.create({
     data: {
       txHash: Hash,
       result: serializedGraph,
-      cexAddresses: cexAddresses
+      cexAddresses: {
+        createMany: {
+          data: edgeAttributesData // Pass the array directly
+        }
+      }
     }
-  })
+  });
+
   return endReceivers;
 };

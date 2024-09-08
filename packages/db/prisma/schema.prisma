@@ -14,7 +14,7 @@ datasource db {
 }
 
 model User {
-  id       Int     @default(autoincrement())
+  id       Int     @default(autoincrement()) @id
   name     String
   agentId  String  @unique
   phoneNo  String
@@ -22,8 +22,19 @@ model User {
 }
 
 model Trace {
-  id       Int    @unique@default(autoincrement())
+  id       Int    @default(autoincrement()) @id
   txHash   String 
   result   Json
-  cexAddresses String[]
+  cexAddresses EdgeAttributes[]
+}
+
+model EdgeAttributes {
+  id Int @default(autoincrement()) @id
+  from String
+  to String
+  value String
+  txHash String
+  blockNumber Int
+  traceId Int 
+  trace Trace @relation(fields: [traceId], references: [id])
 }

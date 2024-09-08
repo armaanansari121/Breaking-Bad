@@ -16,8 +16,8 @@ async function makeRequest(txHash: string) {
         );
         return response.data;
       } catch (error) {
-        if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
-          console.log('Request timed out. Retrying...');
+        if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
+          console.log("Request timed out. Retrying...");
           throw error; // This will trigger a retry
         }
         throw error; // For other errors, throw and stop retrying
@@ -34,11 +34,12 @@ async function makeRequest(txHash: string) {
 
 async function main() {
   try {
-    const txHash = "0x875a90fdad2fdc86f78eb39c19f927a07e062c74960332f6d49af9c315cec682";
+    const txHash =
+      "0x875a90fdad2fdc86f78eb39c19f927a07e062c74960332f6d49af9c315cec682";
     const serializedGraphData = await makeRequest(txHash);
     console.log(serializedGraphData);
   } catch (error) {
-    console.error('Failed to fetch data after multiple retries:', error);
+    console.error("Failed to fetch data after multiple retries:", error);
   }
 }
 

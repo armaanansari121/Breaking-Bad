@@ -1,27 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { hashType } from "common";
 
 export default function Graph() {
   const [txHash, setTxHash] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [previousHashes, setPreviousHashes] = useState<string[]>([]);
+
   const router = useRouter();
 
-  // Load previous hashes from local storage on component mount
-  useEffect(() => {
-    const storedHashes = localStorage.getItem("transactionHashes");
-    if (storedHashes) {
-      setPreviousHashes(JSON.parse(storedHashes));
-    }
-  }, []);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Validate input using hashType schema
+
     const validationResult = hashType.safeParse({ txHash });
     if (!validationResult.success) {
       setError(validationResult.error.errors[0].message);
@@ -29,13 +22,6 @@ export default function Graph() {
     }
 
     setError(null);
-
-    // Store the new hash in local storage
-    const updatedHashes = [...previousHashes, txHash];
-    setPreviousHashes(updatedHashes);
-    localStorage.setItem("transactionHashes", JSON.stringify(updatedHashes));
-
-    // Navigate to the new page with the transaction hash in the URL
     router.push(`/view/${txHash}`);
   };
 
@@ -71,24 +57,7 @@ export default function Graph() {
             Submit
           </button>
         </form>
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Previous Hashes
-          </h2>
-          <div className="overflow-x-auto">
-            <ul className="list-disc pl-5">
-              {previousHashes.length > 0 ? (
-                previousHashes.map((hash, index) => (
-                  <li key={index} className="break-all text-gray-700">
-                    {hash}
-                  </li>
-                ))
-              ) : (
-                <li className="text-gray-500">No previous hashes.</li>
-              )}
-            </ul>
-          </div>
-        </div>
+
       </div>
     </div>
   );

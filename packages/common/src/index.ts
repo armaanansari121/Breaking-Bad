@@ -29,6 +29,8 @@ export const hashType = z.object({
     message: "Invalid Ethereum transaction hash",
   }),
 });
+
+export declare type Hashtype = z.infer<typeof hashType>;
 // End reciver type from trace backend server
 export type receiverType = {
   txhash: string;

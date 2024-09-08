@@ -5,11 +5,10 @@ import MermaidDiagram from "@/components/Mermaid";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import "../../styles.css";
-import { getTraceGraph } from "@/app/actions";
+//import { getTraceGraph } from "@/app/actions";
 import axios from "axios";
 import Graph from "graphology";
 import { NodeAttributes, EdgeAttributes } from "common";
-import { Hashtype } from "common";
 
 const BACKEND_URL = "http://localhost:5000";
 
@@ -57,19 +56,21 @@ newGraph.addEdge("Node1", "Receiver1", {
   blockNumber: 14,
 });
 
-function graphToMermaid(graph: Graph<NodeAttributes, EdgeAttributes>): string {
+function dataToMermaid(
+  data: Array<{ address: string; balance: number }>
+): string {
   let mermaidCode = "graph LR\n";
 
-  graph.forEachNode((node, attributes) => {
-    const label = `${node} (${attributes.balance} ETH)`;
-    mermaidCode += `    ${node}["${label}"]\n`;
+  // Create nodes with labels
+  data.forEach((node) => {
+    const label = `${node.address} (${node.balance} ETH)`;
+    mermaidCode += `    ${node.address}["${label}"]\n`;
   });
 
-  graph.forEachEdge((edge, attributes, source, target) => {
-    const label = `${attributes.value} ETH\nTxHash: ${attributes.txHash}\nBlock: ${attributes.blockNumber}`;
-    mermaidCode += `    ${source} -->|${label}| ${target}\n`;
-  });
-
+  // Connect nodes sequentially
+  for (let i = 0; i < data.length - 1; i++) {
+    mermaidCode += `    ${data[i].address} --> ${data[i + 1].address}\n`;
+  }
   return mermaidCode;
 }
 
@@ -78,23 +79,16 @@ export default function TransactionGraph() {
   const tHash = params.id as string;
   const [generatedGraph, setGeneratedGraph] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [hashInputs, setHashInputs] = useState<Hashtype>({
-    txHash: "",
-  });
 
   useEffect(() => {
     const fetchGraphData = async () => {
       try {
-        setHashInputs({
-          ...hashInputs,
+        const serializedGraphData = await axios.post(`${BACKEND_URL}/trace`, {
           txHash: tHash,
         });
-        const serializedGraphData = await axios.post(
-          `${BACKEND_URL}/trace`,{
-            txHash:"0x875a90fdad2fdc86f78eb39c19f927a07e062c74960332f6d49af9c315cec682"
-          }
-        );
-        console.log(serializedGraphData);
+        console.log(serializedGraphData.data);
+        const mermaidDiagram = dataToMermaid(serializedGraphData.data);
+        setGeneratedGraph(mermaidDiagram);
         /*if (serializedGraphData) {
           const newGraph: Graph<NodeAttributes, EdgeAttributes> = new Graph({
             multi: true,
@@ -114,11 +108,26 @@ export default function TransactionGraph() {
   }, []);
 
   if (loading) {
-    return <div>Loading the graph...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mb-4"></div>
+          <p className="text-xl font-semibold text-gray-700">
+            Loading the graph...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (!generatedGraph) {
-    return <div>No graph data </div>;
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <p className="text-xl font-semibold text-gray-700">
+          No graph data available
+        </p>
+      </div>
+    );
   }
 
   return (

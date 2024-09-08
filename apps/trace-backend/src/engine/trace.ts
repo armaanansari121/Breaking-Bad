@@ -17,7 +17,46 @@ const config = {
 
 const alchemy = new Alchemy(config);
 
+const CEX: string[] = [
+  "0x90Ddd895BC208B6F58009cdac20AcD94EcCf6f70".toLowerCase(),
+  "0x0719cA187937b3D73C6EBab7179502CDbdE3bd69".toLowerCase(),
+];
+
 const graph: Graph<NodeAttributes, EdgeAttributes> = new Graph({ multi: true });
+
+const cexAddresses: string[] = [];
+
+function convertWeiToEth(val: number) {
+  const weiValue = val.toString();
+  const weiLength = weiValue.length;
+  let ethValue;
+  if (weiLength > 18) {
+    ethValue =
+      weiValue.slice(0, weiLength - 18) + "." + weiValue.slice(weiLength - 18);
+  } else {
+    const paddedWeiValue = weiValue.padStart(18, "0");
+    ethValue = "0." + paddedWeiValue;
+  }
+  return ethValue;
+}
+
+function checkBalances(): BalanceInfo[] {
+  let sortedBalances: BalanceInfo[] = [];
+
+  graph.forEachNode((node, attributes) => {
+    const balance = parseFloat(attributes.balance);
+    if (!isNaN(balance)) {
+      sortedBalances.push({ address: node, balance });
+    }
+  });
+
+  sortedBalances.sort((a, b) => b.balance - a.balance);
+  sortedBalances = sortedBalances.filter(
+    (balInfo) => !CEX.includes(balInfo.address)
+  );
+
+  return sortedBalances.slice(0, 5);
+}
 
 async function getTransactions(fromAddress: string) {
   let response = await alchemy.core.getAssetTransfers({
@@ -31,27 +70,11 @@ async function getTransactions(fromAddress: string) {
   return response["transfers"];
 }
 
-function checkBalances(): BalanceInfo[] {
-  const sortedBalances: BalanceInfo[] = [];
-
-  graph.forEachNode((node, attributes) => {
-    const balance = parseFloat(attributes.balance);
-    if (!isNaN(balance)) {
-      sortedBalances.push({ address: node, balance });
-    }
-  });
-
-  sortedBalances.sort((a, b) => b.balance - a.balance);
-
-  return sortedBalances.slice(0, 3);
-}
-
 const traceTransaction = async (
   tx: mappedData,
   retries = 3
 ): Promise<BalanceInfo[] | undefined> => {
   try {
-    // console.log(tx.from, tx.to, tx.txHash);
     if (!tx.to || tx.to.trim() === "") {
       const receipt = await alchemy.core.getTransactionReceipt(tx.txHash);
       if (receipt && receipt.contractAddress) {
@@ -88,6 +111,10 @@ const traceTransaction = async (
       return parseFloat(tx.value).toString();
     });
 
+    if (CEX.includes(tx.to)) {
+      cexAddresses.push(tx.from);
+    }
+
     if (existedTo) return;
     console.log(tx.to);
 
@@ -101,6 +128,9 @@ const traceTransaction = async (
         txHash: tx.hash,
         blockNumber: parseInt(tx.blockNum, 16),
       };
+      if (!txn.value) {
+        txn.value = convertWeiToEth(Number(tx.rawContract.value));
+      }
       if (txn.blockNumber < INITIAL_BLOCK_NUMBER) {
         continue;
       }
@@ -128,20 +158,7 @@ const main = async (Hash: string) => {
     Hash
   )) as TransactionResponse;
 
-  const weiValue = tx.value.toString();
-
-  const weiValue = tx.value.toString(); 
-
-  const weiLength = weiValue.length;
-
-  let ethValue;
-  if (weiLength > 18) {
-    ethValue =
-      weiValue.slice(0, weiLength - 18) + "." + weiValue.slice(weiLength - 18);
-  } else {
-    const paddedWeiValue = weiValue.padStart(18, "0");
-    ethValue = "0." + paddedWeiValue;
-  }
+  const ethValue = convertWeiToEth(Number(tx.value));
 
   INITIAL_BLOCK_NUMBER = tx.blockNumber as number;
   const txObj: mappedData = {
@@ -156,7 +173,7 @@ const main = async (Hash: string) => {
   console.log("==========================================");
   const endReceivers = await traceTransaction(txObj);
   console.log("==========================================");
-  console.log("Top 3 End Receivers:");
+  console.log("Top 5 End Receivers:");
   console.log("==========================================");
   for (const endReceiver of endReceivers ?? []) {
     console.log(`${endReceiver.address}: ${endReceiver.balance}`);

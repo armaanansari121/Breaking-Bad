@@ -11,12 +11,18 @@ export const userType = z.object({
     message: "Password must be minimum 8 characters.",
   }),
 });
+
+export declare type Signuptype = z.infer<typeof userType>;
+
 export const loginType = z.object({
   agentId: z.string(),
   password: z.string().min(8, {
     message: "Invalid password, must be minimum of 8 characters!",
   }),
 });
+
+export declare type Signintype = z.infer<typeof loginType>;
+
 // Hash type schema for Ethereum transaction hash
 export const hashType = z.object({
   txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, {

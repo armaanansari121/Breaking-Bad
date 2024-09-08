@@ -22,7 +22,8 @@ model User {
 }
 
 model Trace {
-  id       Int    @default(autoincrement())
-  txHash   String @unique
+  id       Int    @unique@default(autoincrement())
+  txHash   String 
   result   Json
+  cexAddresses String[]
 }

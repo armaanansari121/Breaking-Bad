@@ -183,10 +183,13 @@ export const startTrace = async (Hash: string) => {
     console.log(`${endReceiver.address}: ${endReceiver.balance}`);
   }
   const serializedGraph = graph.export();
+  console.log(serializedGraph);
+  
   await prisma.trace.create({
     data: {
       txHash: Hash,
-      result: serializedGraph
+      result: serializedGraph,
+      cexAddresses: cexAddresses
     }
   })
   return endReceivers;

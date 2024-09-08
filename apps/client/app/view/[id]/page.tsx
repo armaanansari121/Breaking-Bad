@@ -90,7 +90,7 @@ export default function TransactionGraph() {
           txHash: txHash,
         });
         const serializedGraphData = await axios.post(
-          `${BACKEND_URL}/trace}`,
+          `${BACKEND_URL}/trace`,
           hashInputs
         );
         console.log(serializedGraphData);
@@ -110,7 +110,7 @@ export default function TransactionGraph() {
       }
     };
     fetchGraphData();
-  }, [transactionHash]);
+  }, []);
 
   if (loading) {
     return <div>Loading the graph...</div>;

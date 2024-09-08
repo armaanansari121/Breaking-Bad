@@ -25,9 +25,7 @@ export declare type Signintype = z.infer<typeof loginType>;
 
 // Hash type schema for Ethereum transaction hash
 export const hashType = z.object({
-  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, {
-    message: "Invalid Ethereum transaction hash",
-  }),
+  txHash: z.string(),
 });
 
 export declare type Hashtype = z.infer<typeof hashType>;

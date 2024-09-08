@@ -44,7 +44,8 @@ trace.post('/', async (req, res) => {
         await client2.subscribe(hash, (message) => {
             try {
                 const result = JSON.parse(message);
-                res.send(result.payload);
+                console.log(result.payload);
+                res.status(200).send(result.payload);
             } catch (error) {
                 console.error("Error parsing trace result:", error);
                 if (!res.headersSent) {

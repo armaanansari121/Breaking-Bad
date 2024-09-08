@@ -35,7 +35,10 @@ async function main() {
           txhash: hash,
           payload: result
         };
+        console.log(`Publishing result for hash: ${hash}`);
+        console.log(`Result:`, JSON.stringify(response));
         const publishResult = await client2.publish(hash, JSON.stringify(response));
+        console.log(`Publish result:`, publishResult);
       } catch (error) {
         console.error("Error during trace or publish:", error);
         // Publish an error message to the channel

@@ -1,14 +1,45 @@
-import axios from "axios"
+import axios from "axios";
+import { backOff } from "exponential-backoff";
 
+const MAX_RETRIES = 3;
+const INITIAL_TIMEOUT = 60000; // 60 seconds
+const MAX_TIMEOUT = 300000; // 5 minutes
 
-async function main(){
-const serializedGraphData = await axios.post(
-    `http://localhost:5000/trace`,{
-    txHash: "0x875a90fdad2fdc86f78eb39c19f927a07e062c74960332f6d49af9c315cec682"
-  }
+async function makeRequest(txHash: string) {
+  return backOff(
+    async () => {
+      try {
+        const response = await axios.post(
+          `http://localhost:5000/trace`,
+          { txHash },
+          { timeout: MAX_TIMEOUT }
+        );
+        return response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+          console.log('Request timed out. Retrying...');
+          throw error; // This will trigger a retry
+        }
+        throw error; // For other errors, throw and stop retrying
+      }
+    },
+    {
+      numOfAttempts: MAX_RETRIES,
+      startingDelay: INITIAL_TIMEOUT,
+      timeMultiple: 2,
+      maxDelay: MAX_TIMEOUT,
+    }
   );
-  console.log(serializedGraphData.data);
+}
 
+async function main() {
+  try {
+    const txHash = "0x875a90fdad2fdc86f78eb39c19f927a07e062c74960332f6d49af9c315cec682";
+    const serializedGraphData = await makeRequest(txHash);
+    console.log(serializedGraphData);
+  } catch (error) {
+    console.error('Failed to fetch data after multiple retries:', error);
+  }
 }
 
 main();

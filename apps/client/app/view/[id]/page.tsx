@@ -75,7 +75,7 @@ function graphToMermaid(graph: Graph<NodeAttributes, EdgeAttributes>): string {
 
 export default function TransactionGraph() {
   const params = useParams();
-  const txHash = params.id as string;
+  const tHash = params.id as string;
   const [generatedGraph, setGeneratedGraph] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [hashInputs, setHashInputs] = useState<Hashtype>({
@@ -87,11 +87,12 @@ export default function TransactionGraph() {
       try {
         setHashInputs({
           ...hashInputs,
-          txHash: txHash,
+          txHash: tHash,
         });
         const serializedGraphData = await axios.post(
-          `${BACKEND_URL}/trace`,
-          hashInputs
+          `${BACKEND_URL}/trace`,{
+            txHash:"0x875a90fdad2fdc86f78eb39c19f927a07e062c74960332f6d49af9c315cec682"
+          }
         );
         console.log(serializedGraphData);
         /*if (serializedGraphData) {

@@ -45,7 +45,7 @@ function isValidGraphSerialization(data: JsonValue): data is JsonObject {
 
 function deserializeGraph(serializedData: JsonValue): Graph {
   // Create a new graph
-  const graph = new Graph();
+  const graph = new Graph({ multi: true });
 
   // Validate and parse the serialized data
   if (!isValidGraphSerialization(serializedData)) {
@@ -80,7 +80,8 @@ function deserializeGraph(serializedData: JsonValue): Graph {
   return graph;
 }
 
-cluster.get("/", async (req, res) => {
+cluster.post("/", async (req, res) => {
+  console.log(1);
   try {
     const { txHash } = req.body;
 

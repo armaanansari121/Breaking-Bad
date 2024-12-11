@@ -7,9 +7,13 @@ import {
   NodeAttributes,
   EdgeAttributes,
   FrequencyEdgeAttributes,
+  ValueClusters,
+  Destinations,
+  FrequencyClusters,
 } from "common";
 import Graph from "graphology";
 import { PrismaClient } from "@repo/db";
+import AbstractGraph from "graphology-types";
 dotenv.config();
 
 const config = {
@@ -19,6 +23,8 @@ const config = {
 
 const prisma = new PrismaClient();
 const alchemy = new Alchemy(config);
+
+let INITIAL_BLOCK_NUMBER = 0;
 
 const CEX: string[] = [
   "0x90Ddd895BC208B6F58009cdac20AcD94EcCf6f70".toLowerCase(),
@@ -101,6 +107,7 @@ const traceTransaction = async (
   Depth: number,
   retries = 3
 ): Promise<[BalanceInfo[], FrequencyEdgeAttributes[]] | undefined> => {
+  console.log(Depth);
   if (Depth === 0) return undefined;
   try {
     if (!tx.to || tx.to.trim() === "") {
@@ -116,11 +123,11 @@ const traceTransaction = async (
     const existedFrom = graph.hasNode(tx.from);
 
     if (!existedTo) {
-      graph.addNode(tx.to, { balance: "0" });
+      graph.addNode(tx.to, { balance: "0", cluster: -1 });
       freqGraph.addNode(tx.to);
     }
     if (!existedFrom) {
-      graph.addNode(tx.from, { balance: "0" });
+      graph.addNode(tx.from, { balance: "0", cluster: -1 });
       freqGraph.addNode(tx.from);
     }
 
@@ -203,9 +210,81 @@ const traceTransaction = async (
   }
 };
 
-let INITIAL_BLOCK_NUMBER = 0;
+function computeJaccardSimilarityMatrix(graph: Graph): number[][] {
+  const nodes = graph.nodes();
+  const similarityMatrix: number[][] = [];
 
-export const startTrace = async (Hash: string, Depth: number) => {
+  nodes.forEach((nodeA, indexA) => {
+    similarityMatrix[indexA] = [];
+    const neighborsA = new Set(graph.neighbors(nodeA));
+
+    nodes.forEach((nodeB, indexB) => {
+      if (indexA === indexB) {
+        similarityMatrix[indexA][indexB] = 1; // Self-similarity
+      } else {
+        const neighborsB = new Set(graph.neighbors(nodeB));
+        const intersectionSize = [...neighborsA].filter((n) =>
+          neighborsB.has(n)
+        ).length;
+        const unionSize = new Set([...neighborsA, ...neighborsB]).size;
+        similarityMatrix[indexA][indexB] =
+          unionSize === 0 ? 0 : intersectionSize / unionSize;
+      }
+    });
+  });
+
+  return similarityMatrix;
+}
+
+function performThresholdClustering(
+  similarityMatrix: number[][],
+  threshold = 0.5
+): number[] {
+  const clusters: number[] = [];
+  const clusterCount = similarityMatrix.length;
+
+  // Initialize cluster assignments (-1 means unclustered)
+  for (let i = 0; i < clusterCount; i++) {
+    clusters[i] = -1;
+  }
+
+  let currentClusterId = 0;
+
+  for (let i = 0; i < clusterCount; i++) {
+    if (clusters[i] === -1) {
+      // Start a new cluster
+      clusters[i] = currentClusterId;
+
+      for (let j = 0; j < clusterCount; j++) {
+        if (
+          i !== j &&
+          clusters[j] === -1 &&
+          similarityMatrix[i][j] >= threshold
+        ) {
+          clusters[j] = currentClusterId;
+        }
+      }
+
+      currentClusterId++;
+    }
+  }
+
+  return clusters;
+}
+
+function updateGraphWithClusters(graph: Graph, clusters: number[]) {
+  const nodes = graph.nodes();
+
+  nodes.forEach((node, index) => {
+    graph.updateNodeAttribute(node, "cluster", () => clusters[index]);
+  });
+}
+
+export const startTrace = async (
+  Hash: string,
+  Depth: number = 10,
+  similarityThreshold = 0.5
+) => {
   const tx = (await alchemy.transact.getTransaction(
     Hash
   )) as TransactionResponse;
@@ -238,6 +317,24 @@ export const startTrace = async (Hash: string, Depth: number) => {
   for (const txn of freqPairs ?? []) {
     console.log(`${txn.from} -> ${txn.to} : ${txn.frequency}`);
   }
+
+  console.log("Computing Jaccard Similarity Matrix...");
+  const similarityMatrix = computeJaccardSimilarityMatrix(graph);
+
+  console.log("Performing Threshold-Based Clustering...");
+  const clusters = performThresholdClustering(
+    similarityMatrix,
+    similarityThreshold
+  );
+
+  console.log("Updating Graph with Clusters...");
+  console.log("clusters");
+  console.log(clusters);
+  updateGraphWithClusters(graph, clusters);
+  console.log(graph);
+
+  console.log("Clustering Complete!");
+
   const serializedGraph = graph.export();
   const frequencyGraph = freqGraph.export();
 
@@ -265,6 +362,5 @@ export const startTrace = async (Hash: string, Depth: number) => {
     },
   });
   cexAddresses = [];
-
   return endReceivers;
 };

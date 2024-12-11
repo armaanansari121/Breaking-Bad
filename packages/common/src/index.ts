@@ -48,6 +48,12 @@ export interface BalanceInfo {
   balance: number;
 }
 
+export type FrequencyEdgeAttributes = {
+  from: string;
+  to: string;
+  frequency: number;
+};
+
 export type NodeAttributes = {
   balance: string;
 };
@@ -58,6 +64,35 @@ export type EdgeAttributes = {
   value: string;
   txHash: string;
   blockNumber: number;
+};
+
+// Type for destinations object
+export type Destinations = {
+  [key: string]: number; // Key is the address, and value is the accumulated transaction value
+};
+
+// Type for a single cluster item in value-based clusters
+export interface ValueClusterItem {
+  address: string; // The address being clustered
+  meanValue: number; // The mean transaction value for this address
+  standardDeviation: number; // The standard deviation of transaction values
+}
+
+// Type for value-based clusters
+export type ValueClusters = {
+  [key: string]: ValueClusterItem[]; // Key is the cluster identifier, value is an array of clustered addresses
+};
+
+// Type for a single cluster item in frequency-based clusters
+export interface FrequencyClusterItem {
+  from: string; // Sender address
+  to: string; // Receiver address
+  frequency: number; // Frequency of transactions
+}
+
+// Type for frequency-based clusters
+export type FrequencyClusters = {
+  [key: string]: FrequencyClusterItem[]; // Key is the cluster identifier, value is an array of clustered edges
 };
 
 // Inferred types from the schemas

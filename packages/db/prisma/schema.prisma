@@ -24,7 +24,8 @@ model User {
 model Trace {
   id       Int    @default(autoincrement()) @id
   txHash   String 
-  result   Json
+  graph   Json
+  freqGraph Json 
   cexAddresses EdgeAttributes[]
 }
 

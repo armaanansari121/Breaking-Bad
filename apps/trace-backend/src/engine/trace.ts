@@ -6,9 +6,10 @@ import {
   mappedData,
   NodeAttributes,
   EdgeAttributes,
+  FrequencyEdgeAttributes,
 } from "common";
 import Graph from "graphology";
-import { PrismaClient } from '@repo/db';
+import { PrismaClient } from "@repo/db";
 dotenv.config();
 
 const config = {
@@ -25,7 +26,7 @@ const CEX: string[] = [
 ];
 
 const graph: Graph<NodeAttributes, EdgeAttributes> = new Graph({ multi: true });
-
+const freqGraph: Graph<{}, FrequencyEdgeAttributes> = new Graph();
 
 let cexAddresses: EdgeAttributes[] = [];
 let cexId = 0;
@@ -63,6 +64,26 @@ function checkBalances(): BalanceInfo[] {
   return sortedBalances.slice(0, 5);
 }
 
+function checkFrequencies(): FrequencyEdgeAttributes[] {
+  let sortedBalances: FrequencyEdgeAttributes[] = [];
+
+  freqGraph.forEachEdge((edge, attributes) => {
+    const frequency = attributes.frequency;
+    sortedBalances.push({
+      from: attributes.from,
+      to: attributes.to,
+      frequency,
+    });
+  });
+
+  sortedBalances.sort((a, b) => b.frequency - a.frequency);
+  sortedBalances = sortedBalances.filter(
+    (balInfo) => !CEX.includes(balInfo.to)
+  );
+
+  return sortedBalances.slice(0, 5);
+}
+
 async function getTransactions(fromAddress: string) {
   let response = await alchemy.core.getAssetTransfers({
     fromAddress: fromAddress,
@@ -77,8 +98,10 @@ async function getTransactions(fromAddress: string) {
 
 const traceTransaction = async (
   tx: mappedData,
+  Depth: number,
   retries = 3
-): Promise<BalanceInfo[] | undefined> => {
+): Promise<[BalanceInfo[], FrequencyEdgeAttributes[]] | undefined> => {
+  if (Depth === 0) return undefined;
   try {
     if (!tx.to || tx.to.trim() === "") {
       const receipt = await alchemy.core.getTransactionReceipt(tx.txHash);
@@ -94,9 +117,11 @@ const traceTransaction = async (
 
     if (!existedTo) {
       graph.addNode(tx.to, { balance: "0" });
+      freqGraph.addNode(tx.to);
     }
     if (!existedFrom) {
       graph.addNode(tx.from, { balance: "0" });
+      freqGraph.addNode(tx.from);
     }
 
     graph.addEdge(tx.from, tx.to, {
@@ -106,6 +131,21 @@ const traceTransaction = async (
       txHash: tx.txHash,
       blockNumber: tx.blockNumber,
     });
+
+    if (freqGraph.hasEdge(tx.from, tx.to)) {
+      freqGraph.updateEdgeAttribute(
+        tx.from,
+        tx.to,
+        "frequency",
+        (n: number | undefined) => (n as number) + 1
+      );
+    } else {
+      freqGraph.addEdge(tx.from, tx.to, {
+        from: tx.from,
+        to: tx.to,
+        frequency: 1,
+      });
+    }
 
     graph.updateNodeAttribute(tx.to ?? "", "balance", (bal) => {
       if (bal) return (parseFloat(bal) + parseFloat(tx.value)).toString();
@@ -122,11 +162,9 @@ const traceTransaction = async (
         to: tx.to,
         value: tx.value,
         txHash: tx.txHash,
-        blockNumber: tx.blockNumber
+        blockNumber: tx.blockNumber,
       });
     }
-
-
 
     if (existedTo) return;
     console.log(tx.to);
@@ -147,11 +185,12 @@ const traceTransaction = async (
       if (txn.blockNumber < INITIAL_BLOCK_NUMBER) {
         continue;
       }
-      await traceTransaction(txn);
+      await traceTransaction(txn, Depth - 1);
     }
 
     const endReceiver = checkBalances();
-    return endReceiver;
+    const freqPairs = checkFrequencies();
+    return [endReceiver, freqPairs];
   } catch (error) {
     console.error("Error:", error);
     if (retries > 0) {
@@ -166,13 +205,12 @@ const traceTransaction = async (
 
 let INITIAL_BLOCK_NUMBER = 0;
 
-export const startTrace = async (Hash: string) => {
+export const startTrace = async (Hash: string, Depth: number) => {
   const tx = (await alchemy.transact.getTransaction(
     Hash
   )) as TransactionResponse;
 
   const ethValue = convertWeiToEth(Number(tx.value));
-
 
   INITIAL_BLOCK_NUMBER = tx.blockNumber as number;
   const txObj: mappedData = {
@@ -185,36 +223,48 @@ export const startTrace = async (Hash: string) => {
   console.log("==========================================");
   console.log("Starting Transaction Trace...");
   console.log("==========================================");
-  const endReceivers = await traceTransaction(txObj);
+  const res = await traceTransaction(txObj, Depth);
+  const endReceivers = res?.[0];
+  const freqPairs = res?.[1];
   console.log("==========================================");
   console.log("Top 5 End Receivers:");
   console.log("==========================================");
   for (const endReceiver of endReceivers ?? []) {
     console.log(`${endReceiver.address}: ${endReceiver.balance}`);
   }
+  console.log("==========================================");
+  console.log("Top 5 Frequent Transactions:");
+  console.log("==========================================");
+  for (const txn of freqPairs ?? []) {
+    console.log(`${txn.from} -> ${txn.to} : ${txn.frequency}`);
+  }
   const serializedGraph = graph.export();
+  const frequencyGraph = freqGraph.export();
 
-  const edgeAttributesData = cexAddresses.map(({ from, to, value, txHash, blockNumber }) => ({
-    from,
-    to,
-    value,
-    txHash,
-    blockNumber
-  }));
+  const edgeAttributesData = cexAddresses.map(
+    ({ from, to, value, txHash, blockNumber }) => ({
+      from,
+      to,
+      value,
+      txHash,
+      blockNumber,
+    })
+  );
 
   // Create Trace record with cexAddresses
   await prisma.trace.create({
     data: {
       txHash: Hash,
-      result: serializedGraph,
+      graph: serializedGraph,
+      freqGraph: frequencyGraph,
       cexAddresses: {
         createMany: {
-          data: edgeAttributesData // Pass the array directly
-        }
-      }
-    }
+          data: edgeAttributesData, // Pass the array directly
+        },
+      },
+    },
   });
-  cexAddresses = []
+  cexAddresses = [];
 
   return endReceivers;
 };

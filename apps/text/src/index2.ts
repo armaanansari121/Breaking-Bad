@@ -35,9 +35,9 @@ async function makeRequest(txHash: string) {
 async function main() {
   try {
     const txHash =
-      "0x875a90fdad2fdc86f78eb39c19f927a07e062c74960332f6d49af9c315cec682";
+      "0xd47209c516f338b4e4deda81ea8c0a1459abc0ff62f3271b03cbbd4be8c13537";
     const serializedGraphData = await makeRequest(txHash);
-    console.log(serializedGraphData);
+    // console.log(serializedGraphData);
   } catch (error) {
     console.error("Failed to fetch data after multiple retries:", error);
   }

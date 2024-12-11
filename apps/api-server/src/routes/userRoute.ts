@@ -74,13 +74,13 @@ user.post("/graph", async (req, res) => {
       where: {
         txHash: hash,
       },
-      include:{
-        cexAddresses: true
-      }
+      include: {
+        cexAddresses: true,
+      },
     });
 
     if (trace) {
-      const graph = trace.result;
+      const graph = trace.graph;
       //const cexaddress = trace.cexAddresses;
       const jsonString: string = JSON.stringify(graph);
 
@@ -92,8 +92,13 @@ user.post("/graph", async (req, res) => {
       newGraph.import(serializedValue);
 
       const serializedGraphData = newGraph.export();
-      console.log({ graph: serializedGraphData, addresses: trace.cexAddresses});
-      res.status(200).json({ graph: serializedGraphData, addresses: trace.cexAddresses});
+      console.log({
+        graph: serializedGraphData,
+        addresses: trace.cexAddresses,
+      });
+      res
+        .status(200)
+        .json({ graph: serializedGraphData, addresses: trace.cexAddresses });
     } else {
       res.status(404).json({ error: "Trace not found" });
     }

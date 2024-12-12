@@ -1,76 +1,70 @@
-"use client";
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 
-import React, { useState, useEffect } from "react";
-import { useWeb3Auth } from "./webauthprovider";
-
-const Home: React.FC = () => {
-  const [clientId, setClientId] = useState<string>("");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const { web3auth } = useWeb3Auth();
-
-  useEffect(() => {
-    const storedClientId = localStorage.getItem("clientId");
-    if (storedClientId) {
-      setClientId(storedClientId);
-    }
-  }, []);
-
-  const handleClientIdChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setClientId(event.target.value);
-  };
-
-  const handleVerifyClientId = async () => {
-    try {
-      if (!clientId) {
-        setErrorMessage("Client ID cannot be empty.");
-        return;
-      }
-
-      localStorage.setItem("clientId", clientId);
-
-      await web3auth?.init();
-
-      console.log("Web3Auth initialized successfully with clientId:", clientId);
-      setErrorMessage(null);
-    } catch (error) {
-      setErrorMessage(
-        "Failed to initialize Web3Auth with the provided Client ID."
-      );
-      console.error("Error initializing Web3Auth:", error);
-    }
-  };
-
+export default function Home() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600">
-      <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-          Welcome to the NCB eagle. Please enter your client ID obtained from
-          Web3Auth
-        </h1>
-        <div className="space-y-4">
-          <input
-            type="text"
-            value={clientId}
-            onChange={handleClientIdChange}
-            placeholder="Enter Web3Auth Client ID"
-            className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleVerifyClientId}
-            className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-          >
-            Verify Client ID
-          </button>
-        </div>
-        {errorMessage && (
-          <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
-            <strong>Error: </strong> {errorMessage}
+    <div className="bg-white">
+      <div className="max-w-7xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
+            <span className="block">NCB's Eagle:</span>
+            <span className="block text-blue-600">Advanced Cryptocurrency Transaction Tracing</span>
+          </h1>
+          <p className="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+            Empowering law enforcement agencies with cutting-edge technology to trace and analyze cryptocurrency transactions involved in drug trafficking.
+          </p>
+          <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
+            <div className="rounded-md shadow">
+              <Button asChild>
+                <Link href="/main">Get Started</Link>
+              </Button>
+            </div>
           </div>
-        )}
+        </div>
+      </div>
+      
+      {/* Features Section */}
+      <div className="py-12 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="lg:text-center">
+            <h2 className="text-base text-blue-600 font-semibold tracking-wide uppercase">Features</h2>
+            <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+              Powerful Tools for Cryptocurrency Tracing
+            </p>
+          </div>
+
+          <div className="mt-10">
+            <dl className="space-y-10 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10">
+              {[
+                {
+                  name: 'Advanced Analytics',
+                  description: 'Utilize cutting-edge algorithms to analyze complex transaction patterns.',
+                },
+                {
+                  name: 'Real-time Monitoring',
+                  description: 'Stay updated with real-time alerts on suspicious activities.',
+                },
+                {
+                  name: 'Comprehensive Reporting',
+                  description: 'Generate detailed reports for investigations and legal proceedings.',
+                },
+                {
+                  name: 'Secure and Compliant',
+                  description: 'Built with top-tier security measures and regulatory compliance in mind.',
+                },
+              ].map((feature) => (
+                <div key={feature.name} className="relative">
+                  <dt>
+                    <p className="ml-16 text-lg leading-6 font-medium text-gray-900">{feature.name}</p>
+                  </dt>
+                  <dd className="mt-2 ml-16 text-base text-gray-500">{feature.description}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Home;

@@ -10,6 +10,7 @@ import {
   ValueClusters,
   Destinations,
   FrequencyClusters,
+  PreTrans,
 } from "common";
 import Graph from "graphology";
 import { PrismaClient } from "@repo/db";
@@ -102,114 +103,6 @@ async function getTransactions(fromAddress: string) {
   return response["transfers"];
 }
 
-const traceTransaction = async (
-  tx: mappedData,
-  Depth: number,
-  retries = 3
-): Promise<[BalanceInfo[], FrequencyEdgeAttributes[]] | undefined> => {
-  console.log(Depth);
-  if (Depth === 0) return undefined;
-  try {
-    if (!tx.to || tx.to.trim() === "") {
-      const receipt = await alchemy.core.getTransactionReceipt(tx.txHash);
-      if (receipt && receipt.contractAddress) {
-        tx.to = receipt.contractAddress.toLowerCase();
-      } else {
-        return undefined;
-      }
-    }
-
-    const existedTo = graph.hasNode(tx.to);
-    const existedFrom = graph.hasNode(tx.from);
-
-    if (!existedTo) {
-      graph.addNode(tx.to, { balance: "0", cluster: -1 });
-      freqGraph.addNode(tx.to);
-    }
-    if (!existedFrom) {
-      graph.addNode(tx.from, { balance: "0", cluster: -1 });
-      freqGraph.addNode(tx.from);
-    }
-
-    graph.addEdge(tx.from, tx.to, {
-      from: tx.from,
-      to: tx.to,
-      value: tx.value,
-      txHash: tx.txHash,
-      blockNumber: tx.blockNumber,
-    });
-
-    if (freqGraph.hasEdge(tx.from, tx.to)) {
-      freqGraph.updateEdgeAttribute(
-        tx.from,
-        tx.to,
-        "frequency",
-        (n: number | undefined) => (n as number) + 1
-      );
-    } else {
-      freqGraph.addEdge(tx.from, tx.to, {
-        from: tx.from,
-        to: tx.to,
-        frequency: 1,
-      });
-    }
-
-    graph.updateNodeAttribute(tx.to ?? "", "balance", (bal) => {
-      if (bal) return (parseFloat(bal) + parseFloat(tx.value)).toString();
-      return parseFloat(tx.value).toString();
-    });
-    graph.updateNodeAttribute(tx.from ?? "", "balance", (bal) => {
-      if (bal) return (parseFloat(bal) - parseFloat(tx.value)).toString();
-      return parseFloat(tx.value).toString();
-    });
-
-    if (CEX.includes(tx.to)) {
-      cexAddresses.push({
-        from: tx.from,
-        to: tx.to,
-        value: tx.value,
-        txHash: tx.txHash,
-        blockNumber: tx.blockNumber,
-      });
-    }
-
-    if (existedTo) return;
-    console.log(tx.to);
-
-    const transactions = await getTransactions(tx.to);
-
-    for (const tx of transactions) {
-      const txn: mappedData = {
-        from: tx.from,
-        to: tx.to as string,
-        value: tx.value?.toString() as string,
-        txHash: tx.hash,
-        blockNumber: parseInt(tx.blockNum, 16),
-      };
-      if (!txn.value) {
-        txn.value = convertWeiToEth(Number(tx.rawContract.value));
-      }
-      if (txn.blockNumber < INITIAL_BLOCK_NUMBER) {
-        continue;
-      }
-      await traceTransaction(txn, Depth - 1);
-    }
-
-    const endReceiver = checkBalances();
-    const freqPairs = checkFrequencies();
-    return [endReceiver, freqPairs];
-  } catch (error) {
-    console.error("Error:", error);
-    if (retries > 0) {
-      console.log(`Retrying... (${retries} attempts left)`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    } else {
-      console.error("Max retries reached. Unable to process transaction:");
-      return undefined;
-    }
-  }
-};
-
 function computeJaccardSimilarityMatrix(graph: Graph): number[][] {
   const nodes = graph.nodes();
   const similarityMatrix: number[][] = [];
@@ -280,6 +173,213 @@ function updateGraphWithClusters(graph: Graph, clusters: number[]) {
   });
 }
 
+interface TransactionTime {
+  blockNumbers: number[];
+  intervals: number[];
+  meanInterval?: number;
+  stdDeviation?: number;
+}
+const transactionTimes: Map<string, TransactionTime> = new Map();
+
+const predictedTransactions: PreTrans[] = [];
+
+function storePrediction(from: string, to: string, predictedBlock: number) {
+  predictedTransactions.push({ from, to, predictedBlock });
+}
+
+function updateTransactionTimes(from: string, to: string, blockNumber: number) {
+  const key = `${from}-${to}`;
+  let transactionTime = transactionTimes.get(key);
+
+  if (!transactionTime) {
+    transactionTime = { blockNumbers: [], intervals: [] };
+    transactionTimes.set(key, transactionTime);
+  }
+
+  const lastBlock =
+    transactionTime.blockNumbers[transactionTime.blockNumbers.length - 1];
+  if (lastBlock !== undefined) {
+    // Calculate the interval
+    const interval = blockNumber - lastBlock;
+    transactionTime.intervals.push(interval);
+  }
+
+  transactionTime.blockNumbers.push(blockNumber);
+}
+
+function calculateMeanAndStdDeviation(intervals: number[]): {
+  mean: number;
+  stdDeviation: number;
+} {
+  const mean =
+    intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+
+  const variance =
+    intervals.reduce((sum, interval) => sum + Math.pow(interval - mean, 2), 0) /
+    intervals.length;
+  const stdDeviation = Math.sqrt(variance);
+
+  return { mean, stdDeviation };
+}
+
+function predictNextTransactionBlock(
+  from: string,
+  to: string
+): number | undefined {
+  const key = `${from}-${to}`;
+  const transactionTime = transactionTimes.get(key);
+
+  if (!transactionTime || transactionTime.intervals.length < 2) {
+    // Not enough data to make a prediction
+    return undefined;
+  }
+
+  const { mean, stdDeviation } = calculateMeanAndStdDeviation(
+    transactionTime.intervals
+  );
+
+  // If the standard deviation is low, predict the next block number
+  if (stdDeviation < mean * 0.2) {
+    // Adjust threshold as necessary
+    const nextBlockPrediction =
+      transactionTime.blockNumbers[transactionTime.blockNumbers.length - 1] +
+      mean;
+    predictedTransactions.push({
+      from,
+      to,
+      predictedBlock: Math.round(nextBlockPrediction),
+    }); // Store the prediction
+    return Math.round(nextBlockPrediction);
+  }
+
+  return undefined; // No prediction if the intervals are too irregular
+}
+
+const traceTransaction = async (
+  tx: mappedData,
+  Depth: number,
+  retries = 3
+): Promise<[BalanceInfo[], FrequencyEdgeAttributes[]] | undefined> => {
+  console.log(Depth);
+  if (Depth === 0) return undefined;
+  try {
+    if (!tx.to || tx.to.trim() === "") {
+      const receipt = await alchemy.core.getTransactionReceipt(tx.txHash);
+      // console.log(receipt);
+      if (receipt && receipt.contractAddress) {
+        tx.to = receipt.contractAddress.toLowerCase();
+      } else {
+        return undefined;
+      }
+    }
+    console.log(tx.txHash, tx.value);
+
+    const existedTo = graph.hasNode(tx.to);
+    const existedFrom = graph.hasNode(tx.from);
+
+    if (!existedTo) {
+      graph.addNode(tx.to, { balance: "0", cluster: -1 });
+      freqGraph.addNode(tx.to);
+    }
+    if (!existedFrom) {
+      graph.addNode(tx.from, { balance: "0", cluster: -1 });
+      freqGraph.addNode(tx.from);
+    }
+
+    graph.addEdge(tx.from, tx.to, {
+      from: tx.from,
+      to: tx.to,
+      value: tx.value,
+      txHash: tx.txHash,
+      blockNumber: tx.blockNumber,
+    });
+
+    if (freqGraph.hasEdge(tx.from, tx.to)) {
+      freqGraph.updateEdgeAttribute(
+        tx.from,
+        tx.to,
+        "frequency",
+        (n: number | undefined) => (n as number) + 1
+      );
+    } else {
+      freqGraph.addEdge(tx.from, tx.to, {
+        from: tx.from,
+        to: tx.to,
+        frequency: 1,
+      });
+    }
+
+    // Update transaction times and predict next block
+    updateTransactionTimes(tx.from, tx.to, tx.blockNumber);
+
+    const predictedBlock = predictNextTransactionBlock(tx.from, tx.to);
+    if (predictedBlock !== undefined) {
+      console.log(
+        `Predicted next transaction block for ${tx.from} -> ${tx.to}: ${predictedBlock}`
+      );
+    }
+
+    graph.updateNodeAttribute(tx.to ?? "", "balance", (bal) => {
+      if (bal) return (parseFloat(bal) + parseFloat(tx.value)).toString();
+      return parseFloat(tx.value).toString();
+    });
+    graph.updateNodeAttribute(tx.from ?? "", "balance", (bal) => {
+      if (bal) return (parseFloat(bal) - parseFloat(tx.value)).toString();
+      return parseFloat(tx.value).toString();
+    });
+
+    if (CEX.includes(tx.to)) {
+      cexAddresses.push({
+        from: tx.from,
+        to: tx.to,
+        value: tx.value,
+        txHash: tx.txHash,
+        blockNumber: tx.blockNumber,
+      });
+    }
+
+    if (existedTo) return;
+    console.log(tx.to);
+
+    const transactions = await getTransactions(tx.to);
+    // console.log(transactions);
+
+    for (const tx of transactions) {
+      // console.log(tx);
+      const txn: mappedData = {
+        from: tx.from,
+        to: tx.to as string,
+        value: tx.value?.toString() as string,
+        txHash: tx.hash,
+        blockNumber: parseInt(tx.blockNum, 16),
+      };
+      if (tx.category === "erc20") {
+        txn.value = (Number(txn.value) / 1000).toString();
+      }
+      if (!txn.value) {
+        txn.value = convertWeiToEth(Number(tx.rawContract.value));
+      }
+      if (txn.blockNumber < INITIAL_BLOCK_NUMBER) {
+        continue;
+      }
+      await traceTransaction(txn, Depth - 1);
+    }
+
+    const endReceiver = checkBalances();
+    const freqPairs = checkFrequencies();
+    return [endReceiver, freqPairs];
+  } catch (error) {
+    console.error("Error:", error);
+    if (retries > 0) {
+      console.log(`Retrying... (${retries} attempts left)`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    } else {
+      console.error("Max retries reached. Unable to process transaction:");
+      return undefined;
+    }
+  }
+};
+
 export const startTrace = async (
   Hash: string,
   Depth: number = 10,
@@ -303,8 +403,14 @@ export const startTrace = async (
   console.log("Starting Transaction Trace...");
   console.log("==========================================");
   const res = await traceTransaction(txObj, Depth);
-  const endReceivers = res?.[0];
-  const freqPairs = res?.[1];
+  const endReceivers = res?.[0] || [];
+  const freqPairs = res?.[1] ?? [
+    {
+      from: "",
+      to: "",
+      frequency: 0,
+    },
+  ];
   console.log("==========================================");
   console.log("Top 5 End Receivers:");
   console.log("==========================================");
@@ -329,11 +435,21 @@ export const startTrace = async (
 
   console.log("Updating Graph with Clusters...");
   console.log("clusters");
-  console.log(clusters);
   updateGraphWithClusters(graph, clusters);
-  console.log(graph);
 
   console.log("Clustering Complete!");
+
+  // --------------------------------
+  // Log all the predicted transactions
+  console.log("==========================================");
+  console.log("Predicted Transactions:");
+  console.log("==========================================");
+  predictedTransactions.forEach((prediction) => {
+    console.log(
+      `${prediction.from} -> ${prediction.to} : Predicted Block - ${prediction.predictedBlock}`
+    );
+  });
+  // --------------------------------
 
   const serializedGraph = graph.export();
   const frequencyGraph = freqGraph.export();
@@ -354,6 +470,21 @@ export const startTrace = async (
       txHash: Hash,
       graph: serializedGraph,
       freqGraph: frequencyGraph,
+      endReceivers: {
+        createMany: {
+          data: endReceivers, // Pass the array directly
+        },
+      },
+      freqedgeattributes: {
+        createMany: {
+          data: freqPairs, // Pass the array directly
+        },
+      },
+      predictedTxs: {
+        createMany: {
+          data: predictedTransactions, // Pass the array directly
+        },
+      },
       cexAddresses: {
         createMany: {
           data: edgeAttributesData, // Pass the array directly
@@ -362,5 +493,6 @@ export const startTrace = async (
     },
   });
   cexAddresses = [];
+  // console.log(endReceivers);
   return endReceivers;
 };

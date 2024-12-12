@@ -28,7 +28,7 @@ export const Auth = ({ type }: { type: "signup" | "signin" }) => {
       localStorage.setItem("authToken", jwt.result);
       router.push("/graph");
     } catch (e) {
-      alert("Error while signing up");
+      alert(`Error while signing up ${e}`);
     }
   };
 

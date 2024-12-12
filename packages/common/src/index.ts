@@ -26,7 +26,7 @@ export declare type Signintype = z.infer<typeof loginType>;
 // Hash type schema for Ethereum transaction hash
 export const hashType = z.object({
   txHash: z.string(),
-  Depth: z.number(),
+  Depth: z.number().optional(),
 });
 
 export declare type Hashtype = z.infer<typeof hashType>;
@@ -66,6 +66,12 @@ export type EdgeAttributes = {
   value: string;
   txHash: string;
   blockNumber: number;
+};
+
+export type PreTrans = {
+  from: string;
+  to: string;
+  predictedBlock: number;
 };
 
 // Type for destinations object

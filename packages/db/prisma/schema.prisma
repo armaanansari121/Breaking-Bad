@@ -21,11 +21,40 @@ model User {
   password String 
 }
 
+model PreTx {
+  id    Int     @default(autoincrement()) @id
+  from String
+  to  String
+  predictedBlock Int
+  traceId Int
+  trace Trace @relation(fields: [traceId], references: [id])
+}
+
+model EndReceiver {
+  id       Int    @default(autoincrement()) @id
+  address String
+  balance Int
+  traceId Int
+  trace Trace @relation(fields: [traceId], references: [id])
+}
+
+model FreqeAttributes {
+  id       Int    @default(autoincrement()) @id
+  from String
+  to  String
+  frequency Int
+  traceId Int
+  trace Trace @relation(fields: [traceId], references: [id])
+}
+
 model Trace {
   id       Int    @default(autoincrement()) @id
   txHash   String 
   graph   Json
-  freqGraph Json 
+  freqGraph Json
+  endReceivers EndReceiver[] 
+  predictedTxs PreTx[]
+  freqedgeattributes FreqeAttributes[]
   cexAddresses EdgeAttributes[]
 }
 

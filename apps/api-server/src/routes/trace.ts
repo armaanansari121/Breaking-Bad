@@ -37,7 +37,7 @@ trace.post("/", async (req, res) => {
     }
 
     const hash = response.data?.txHash;
-    const depth = response.data?.Depth.toString();
+    const depth = (response.data.Depth ?? 10).toString();
     // console.log(depth);
     if (!hash) {
       return res.status(400).send({ payload: "Invalid transaction hash" });

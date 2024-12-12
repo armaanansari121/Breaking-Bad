@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import Header from "@/components/Header";
+import { Web3AuthProvider } from "./webauthprovider";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -34,7 +35,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Header />
-        <main>{children}</main>
+        <main>
+          <Web3AuthProvider>{children}</Web3AuthProvider>
+        </main>
       </body>
     </html>
   );

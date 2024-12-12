@@ -7,13 +7,10 @@ import { hashType } from "common";
 export default function Graph() {
   const [txHash, setTxHash] = useState("");
   const [error, setError] = useState<string | null>(null);
-
   const router = useRouter();
-
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-
 
     const validationResult = hashType.safeParse({ txHash });
     if (!validationResult.success) {
@@ -57,7 +54,6 @@ export default function Graph() {
             Submit
           </button>
         </form>
-
       </div>
     </div>
   );

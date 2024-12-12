@@ -1,49 +1,76 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
-export default function Home() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+import React, { useState, useEffect } from "react";
+import { useWeb3Auth } from "./webauthprovider";
+
+const Home: React.FC = () => {
+  const [clientId, setClientId] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const { web3auth } = useWeb3Auth();
 
   useEffect(() => {
-    router.replace("/signup");
-  }, [router]);
+    const storedClientId = localStorage.getItem("clientId");
+    if (storedClientId) {
+      setClientId(storedClientId);
+    }
+  }, []);
+
+  const handleClientIdChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setClientId(event.target.value);
+  };
+
+  const handleVerifyClientId = async () => {
+    try {
+      if (!clientId) {
+        setErrorMessage("Client ID cannot be empty.");
+        return;
+      }
+
+      localStorage.setItem("clientId", clientId);
+
+      await web3auth?.init();
+
+      console.log("Web3Auth initialized successfully with clientId:", clientId);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        "Failed to initialize Web3Auth with the provided Client ID."
+      );
+      console.error("Error initializing Web3Auth:", error);
+    }
+  };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gradient-to-r from-blue-400 to-purple-500">
-      <button
-        className="px-4 py-2 font-bold text-white bg-slate-500 rounded-full hover:bg-slate-700 focus:outline-none focus:shadow-outline"
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <>
-            <svg
-              className="w-5 h-5 mr-3 -ml-1 text-white animate-spin inline-block"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            Entering...
-          </>
-        ) : (
-          "Go to Signup"
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600">
+      <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+          Welcome to the NCB eagle. Please enter your client ID obtained from
+          Web3Auth
+        </h1>
+        <div className="space-y-4">
+          <input
+            type="text"
+            value={clientId}
+            onChange={handleClientIdChange}
+            placeholder="Enter Web3Auth Client ID"
+            className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={handleVerifyClientId}
+            className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+          >
+            Verify Client ID
+          </button>
+        </div>
+        {errorMessage && (
+          <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
+            <strong>Error: </strong> {errorMessage}
+          </div>
         )}
-      </button>
+      </div>
     </div>
   );
-}
+};
+
+export default Home;

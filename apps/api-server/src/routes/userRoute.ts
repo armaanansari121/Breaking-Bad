@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 user.post("/signup", async (req, res) => {
   const response = userType.safeParse(req.body);
   if (!response.success) {
-    return res.send({ payload: response.error.errors[0].message });
+    return res.send({ payload: "Can't sign you up" });
   }
   if (response.data === undefined) {
     return res.send({ payload: "Empty fields" });
@@ -39,20 +39,16 @@ user.post("/signup", async (req, res) => {
 });
 
 user.post("/signin", async (req, res) => {
-  const response = loginType.safeParse(req.body);
-  if (!response.success) {
-    return res.status(400).send({ payload: response.error.errors[0].message });
-  }
-  if (response.data === undefined) {
-    return res.send({ payload: "Empty fields" });
-  }
+  const { agentId, password } = req.body;
+
   try {
     const response2 = await prisma.user.findFirst({
       where: {
-        agentId: response.data.agentId,
-        password: response.data.password,
+        agentId: agentId,
+        password: password,
       },
     });
+    console.log(response2);
     if (response2 != null) {
       return res.status(200).json({ result: true, payload: user });
     } else {
@@ -76,6 +72,9 @@ user.post("/graph", async (req, res) => {
       },
       include: {
         cexAddresses: true,
+        freqedgeattributes: true,
+        predictedTxs: true,
+        endReceivers: true,
       },
     });
 
@@ -98,7 +97,13 @@ user.post("/graph", async (req, res) => {
       });
       res
         .status(200)
-        .json({ graph: serializedGraphData, addresses: trace.cexAddresses });
+        .json({
+          graph: serializedGraphData,
+          addresses: trace.cexAddresses,
+          freqPairs: trace.freqedgeattributes,
+          endRec: trace.endReceivers,
+          predictedTxns: trace.predictedTxs,
+        });
     } else {
       res.status(404).json({ error: "Trace not found" });
     }

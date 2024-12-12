@@ -19,7 +19,7 @@ dotenv.config();
 
 const config = {
   apiKey: process.env.ALCHEMY_API_KEY,
-  network: Network.ETH_SEPOLIA,
+  network: Network.ETH_MAINNET,
 };
 
 const prisma = new PrismaClient();
@@ -28,8 +28,23 @@ const alchemy = new Alchemy(config);
 let INITIAL_BLOCK_NUMBER = 0;
 
 const CEX: string[] = [
-  "0x90Ddd895BC208B6F58009cdac20AcD94EcCf6f70".toLowerCase(),
-  "0x0719cA187937b3D73C6EBab7179502CDbdE3bd69".toLowerCase(),
+  "0xccfa6f3b01c7bf07b033a9d496fdf22f0cdf5293",
+  "0x06051836ac6c5112b890f8b6ec78e33d1afeae7c",
+  "0x2407b9b9662d970ece2224a0403d3b15c7e4d1fe",
+  "0x3698cc7f524bade1a05e02910538f436a3e94384",
+  "0x4d24eececb86041f47bca41265319e9f06ae2fcb",
+  "0x763104507945b6b7f21ee68b92048a53f7debf18",
+  "0x78bba2389c2ceeb6f94c70ed133712e3b3e2c4d0",
+  "0x881f982575a3ecbea6fe133ddb0951303215d130",
+  "0x8c7efd5b04331efc618e8006f19019a3dc88973e",
+  "0xa4fe2f90a8991a410c825c983cbb6a92d03607fc",
+  "0xa916a54af7553bae6172e510d067826bd204d0dd",
+  "0xaa8bc1fc0fcfdca5b7e5d35e5ac13800850d90c7",
+  "0x17f1a51da68d27c94d2a51d92b27b5bd4718b986",
+  "0x7a20527ba5a749b3b054a821950bfcc2c01b959f",
+  "0x777d4627e31863b2a49e2985af46525f21a9846c",
+  "0xd996035db82cae33ba1f16fdf23b816e5e9faabb",
+  "0xd0808da05cc71a9f308d330bc9c5c81bbc26fc59",
 ];
 
 const graph: Graph<NodeAttributes, EdgeAttributes> = new Graph({ multi: true });
@@ -272,7 +287,7 @@ const traceTransaction = async (
         return undefined;
       }
     }
-    console.log(tx.txHash, tx.value);
+    // console.log(tx.txHash, tx.value);
 
     const existedTo = graph.hasNode(tx.to);
     const existedFrom = graph.hasNode(tx.from);
@@ -345,7 +360,7 @@ const traceTransaction = async (
     // console.log(transactions);
 
     for (const tx of transactions) {
-      // console.log(tx);
+      // console.log(tx.category);
       const txn: mappedData = {
         from: tx.from,
         to: tx.to as string,
@@ -354,6 +369,7 @@ const traceTransaction = async (
         blockNumber: parseInt(tx.blockNum, 16),
       };
       if (tx.category === "erc20") {
+        // console.log(tx);
         txn.value = (Number(txn.value) / 1000).toString();
       }
       if (!txn.value) {

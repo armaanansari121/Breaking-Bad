@@ -35,7 +35,7 @@ async function makeRequest(txHash: string, Depth: number) {
 async function main() {
   try {
     const txHash =
-      "0x3693fd9439e26e878f9322c33d4fcef7eb1ff90d7f7e4be4624f2aeff08c65f5";
+      "0xc2c6f9dcb10f3c26e24ece683f0a73c46b9fcf97f2e3f5a4c1c29766994f99e7";
     const serializedGraphData = await makeRequest(txHash, 10);
     // console.log(serializedGraphData);
   } catch (error) {

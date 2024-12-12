@@ -12,11 +12,16 @@
     "@web3auth/base": "^9.4.5",
     "@web3auth/ethereum-provider": "^9.4.5",
     "@web3auth/modal": "^9.4.5",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.14.0",
     "graphology": "^0.25.4",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2",
     "mermaid": "^11.1.1",
     "next": "14.2.8",
     "react": "^18",
     "react-dom": "^18",
+    "tailwind-merge": "^2.5.5",
     "ui": "*"
   },
   "devDependencies": {

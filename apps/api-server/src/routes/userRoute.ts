@@ -62,6 +62,7 @@ user.post("/signin", async (req, res) => {
 });
 
 user.post("/graph", async (req, res) => {
+  // console.log(1);
   try {
     const response = hashType.safeParse(req.body);
     const hash = response.data?.txHash as string;
@@ -95,15 +96,13 @@ user.post("/graph", async (req, res) => {
         graph: serializedGraphData,
         addresses: trace.cexAddresses,
       });
-      res
-        .status(200)
-        .json({
-          graph: serializedGraphData,
-          addresses: trace.cexAddresses,
-          freqPairs: trace.freqedgeattributes,
-          endRec: trace.endReceivers,
-          predictedTxns: trace.predictedTxs,
-        });
+      res.status(200).json({
+        graph: serializedGraphData,
+        addresses: trace.cexAddresses,
+        freqPairs: trace.freqedgeattributes,
+        endRec: trace.endReceivers,
+        predictedTxns: trace.predictedTxs,
+      });
     } else {
       res.status(404).json({ error: "Trace not found" });
     }

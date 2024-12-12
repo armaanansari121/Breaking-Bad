@@ -27,7 +27,7 @@ const client2: RedisClientType = createClient({
 
 trace.post("/", async (req, res) => {
   let unsubscribe: (() => void) | null = null;
-
+  // console.log(1);
   try {
     const response = hashType.safeParse(req.body);
     if (!response.success) {

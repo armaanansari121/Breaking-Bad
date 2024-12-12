@@ -9,8 +9,11 @@ import "../../styles.css";
 import axios from "axios";
 import { backOff } from "exponential-backoff";
 import { FrequencyEdgeAttributes, PreTrans } from "common";
-
-const BACKEND_URL = "http://localhost:5000";
+import { Lens } from "@/components/Lens";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+import { useRef } from "react";
+// const BACKEND_URL = "http://localhost:5000";
 
 interface EdgeAttribute {
   id: number;
@@ -58,7 +61,17 @@ export default function TransactionGraph() {
   const [predictedTransactions, setPredictedTransactions] = useState<
     PreTrans[]
   >([]);
+  const componentRef = useRef<HTMLDivElement>(null);
 
+  const handleDownload = async () => {
+    if (componentRef.current) {
+      const canvas = await html2canvas(componentRef.current);
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF();
+      pdf.addImage(imgData, "PNG", 10, 10, 190, 0); // Adjust dimensions
+      pdf.save("component.pdf");
+    }
+  };
   const MAX_RETRIES = 3;
   const INITIAL_TIMEOUT = 60000; // 60 seconds
   const MAX_TIMEOUT = 300000; // 5 minutes
@@ -101,8 +114,8 @@ export default function TransactionGraph() {
 
         const serializedGraphData = await makeRequest(tHash, 10);
 
-        console.log(serializedGraphData.data);
-        const nodes = serializedGraphData.data.graph.nodes;
+        console.log(serializedGraphData);
+        const nodes = serializedGraphData.graph.nodes;
         console.log(nodes);
         // const newClusters: Record<number, any[]> = {};
         // nodes.map((node: any) => {
@@ -110,7 +123,7 @@ export default function TransactionGraph() {
         // });
         // setClusters(newClusters);
         // console.log(newClusters);
-        // Group nodes into clusters
+        // // Group nodes into clusters
         const clusterMap: Record<number, any[]> = {};
         nodes.forEach((node: any) => {
           const clusterId = node.attributes.cluster; // Adjust the key based on your data structure
@@ -128,16 +141,16 @@ export default function TransactionGraph() {
         console.log("Large Clusters:", largeClusters);
         setClusters(largeClusters);
 
-        if (serializedGraphData.data) {
+        if (serializedGraphData) {
           try {
-            const exgraph = convertToMermaid(serializedGraphData.data.graph);
+            const exgraph = convertToMermaid(serializedGraphData.graph);
             setGeneratedGraph(exgraph);
-            setEndReceivers(serializedGraphData.data.endRec);
-            setFreqPairs(serializedGraphData.data.freqPairs);
-            setPredictedTransactions(serializedGraphData.data.predictedTxns);
+            setEndReceivers(serializedGraphData.endRec);
+            setFreqPairs(serializedGraphData.freqPairs);
+            setPredictedTransactions(serializedGraphData.predictedTxns);
             setCexAddresses(
-              Array.isArray(serializedGraphData.data.addresses)
-                ? serializedGraphData.data.addresses
+              Array.isArray(serializedGraphData.addresses)
+                ? serializedGraphData.addresses
                 : []
             );
           } catch (conversionError) {
@@ -154,7 +167,7 @@ export default function TransactionGraph() {
     };
 
     fetchGraphData();
-  }, []);
+  }, [tHash]);
 
   if (loading) {
     return (
@@ -183,10 +196,12 @@ export default function TransactionGraph() {
     <>
       <div>
         <div className="mt-20">
-          <MermaidDiagram chart={generatedGraph} />
+          <Lens lensSize={200} zoomFactor={2}>
+            <MermaidDiagram chart={generatedGraph} />
+          </Lens>
         </div>
         {endReceivers.length > 0 && (
-          <div className="mt-20 px-4">
+          <div className="mt-20 px-4" ref={componentRef}>
             <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
               Top 5 End Receivers
             </h2>
@@ -206,10 +221,11 @@ export default function TransactionGraph() {
                 </div>
               ))}
             </div>
+            <button onClick={handleDownload}>Download as PDF</button>
           </div>
         )}
         {cexAddresses && cexAddresses.length > 0 && (
-          <div className="mt-20 px-4">
+          <div className="mt-20 px-4" ref={componentRef}>
             <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
               CEX Transactions
             </h2>
